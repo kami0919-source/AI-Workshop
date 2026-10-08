@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日本 47 都道府縣制霸互動圖 | Japan Travel Footprint</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Zen Maru Gothic & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            jpGold: {
+              300: '#FDE047',
+              400: '#FACC15',
+              500: '#EAB308',
+              600: '#CA8A04',
+            },
+            jpRed: '#DC2626',
+            jpIndigo: '#1E293B',
+          },
+          fontFamily: {
+            japanese: ['"Zen Maru Gothic"', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Zen Maru Gothic', 'Inter', -apple-system, sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    /* 地圖卡片立體質感 */
+    .pref-node {
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .pref-node:hover {
+      transform: translateY(-2px);
+    }
+
+    .pref-node:active {
+      transform: scale(0.97);
+    }
+
+    /* 未解鎖 (灰階/未訪問) */
+    .pref-locked {
+      background-color: #f1f5f9;
+      color: #64748b;
+      border: 1.5px solid #e2e8f0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .pref-locked:hover {
+      border-color: #cbd5e1;
+      background-color: #e2e8f0;
+      color: #334155;
+    }
+
+    /* 已解鎖 (亮金黃色/已制霸) */
+    .pref-unlocked {
+      background: linear-gradient(135deg, #FDE047 0%, #EAB308 100%);
+      color: #713f12;
+      border: 1.5px solid #CA8A04;
+      font-weight: 700;
+      box-shadow: 0 4px 14px -2px rgba(234, 179, 8, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .pref-unlocked:hover {
+      box-shadow: 0 6px 18px -2px rgba(234, 179, 8, 0.6);
+      filter: brightness(1.03);
+    }
+
+    /* Progress bar smooth fill */
+    .progress-fill {
+      transition: width 0.45s ease-out;
+    }
+
+    /* Custom subtle toast */
+    .toast-animate {
+      animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="p-3 sm:p-6 md:p-8">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- 頂部標題區 -->
+    <header class="bg-white/90 backdrop-blur-md rounded-2xl p-5 sm:p-7 shadow-sm border border-slate-200/80">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-amber-50 text-amber-800 border border-amber-200/60 mb-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            Travel Tracker
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800 flex items-center gap-2">
+            <span>🇯🇵</span>
+            <span>日本 47 都道府縣制霸圖</span>
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">點擊都道府縣即可切換「未造訪 / 已制霸」狀態，自動記錄您的日本旅遊印記！</p>
+        </div>
+
+        <!-- 稱號與評級徽章 -->
+        <div class="flex items-center gap-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-3.5 rounded-xl">
+          <div class="text-3xl" id="badge-icon">🎒</div>
+          <div>
+            <div class="text-xs text-amber-700/80 font-medium">當前制霸位階</div>
+            <div class="text-lg font-black text-amber-900" id="badge-title">新手旅人</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 即時進度條與統計 -->
+      <div class="mt-6 pt-5 border-t border-slate-100">
+        <div class="flex flex-wrap items-end justify-between gap-2 mb-2.5">
+          <div class="flex items-baseline gap-2">
+            <span class="text-sm text-slate-500 font-medium">制霸進度：</span>
+            <span class="text-3xl font-black text-amber-600" id="unlocked-count">0</span>
+            <span class="text-lg font-bold text-slate-400">/ 47</span>
+          </div>
+          <div class="text-sm font-bold text-slate-600" id="unlocked-percentage">0.0%</div>
+        </div>
+        
+        <!-- 軌道與進度條 -->
+        <div class="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
+          <div id="progress-bar" class="progress-fill h-full rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-400" style="width: 0%"></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+      <!-- 搜尋框 -->
+      <div class="relative flex-1 max-w-sm">
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="搜尋縣市（如：京都、北海道、沖繩）..." 
+          class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition"
+        />
+        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+
+      <!-- 操作按鈕列 -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="btn-select-all" class="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-lg transition">
+          全部點亮
+        </button>
+        <button id="btn-clear-all" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 active:scale-95 rounded-lg transition">
+          全部重設
+        </button>
+        <button id="btn-share" class="px-4 py-2 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 rounded-lg shadow-sm shadow-amber-200 transition flex items-center gap-1.5">
+          <span>📋</span>
+          <span>複製制霸戰報</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 八大地方分區展示網格 -->
+    <main id="regions-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 分區卡片將由 JavaScript 動態生成注入 -->
+    </main>
+
+    <!-- 底部說明與版權 -->
+    <footer class="text-center text-xs text-slate-400 pt-6 pb-4">
+      <p>💡 資料會自動儲存於您的瀏覽器中，下次開啟時將保留制霸進度。</p>
+      <p class="mt-1">日本 47 都道府縣制霸互動圖 &bull; 免費相容嵌入於 Google Sites、Notion 與一般網頁</p>
+    </footer>
+
+  </div>
+
+  <div id="toast" class="fixed bottom-6 right-6 hidden z-50">
+    <div class="bg-slate-900/90 backdrop-blur text-white px-4 py-2.5 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2 border border-slate-700 toast-animate">
+      <span id="toast-icon">✨</span>
+      <span id="toast-text">已複製成功！</span>
+    </div>
+  </div>
+
+  <script>
+    // 47 都道府縣清單（依官方八大地方分類）
+    const JAPAN_REGIONS = [
+      {
+        id: "hokkaido",
+        name: "北海道",
+        kana: "ほっかいどう",
+        colorBadge: "bg-sky-100 text-sky-800",
+        prefectures: [
+          { id: "hokkaido", name: "北海道", romaji: "Hokkaido" }
+        ]
+      },
+      {
+        id: "tohoku",
+        name: "東北地方",
+        kana: "とうほく",
+        colorBadge: "bg-emerald-100 text-emerald-800",
+        prefectures: [
+          { id: "aomori", name: "青森縣", romaji: "Aomori" },
+          { id: "iwate", name: "岩手縣", romaji: "Iwate" },
+          { id: "miyagi", name: "宮城縣", romaji: "Miyagi" },
+          { id: "akita", name: "秋田縣", romaji: "Akita" },
+          { id: "yamagata", name: "山形縣", romaji: "Yamagata" },
+          { id: "fukushima", name: "福島縣", romaji: "Fukushima" }
+        ]
+      },
+      {
+        id: "kanto",
+        name: "關東地方",
+        kana: "かんとう",
+        colorBadge: "bg-purple-100 text-purple-800",
+        prefectures: [
+          { id: "ibaraki", name: "茨城縣", romaji: "Ibaraki" },
+          { id: "tochigi", name: "栃木縣", romaji: "Tochigi" },
+          { id: "gunma", name: "群馬縣", romaji: "Gunma" },
+          { id: "saitama", name: "埼玉縣", romaji: "Saitama" },
+          { id: "chiba", name: "千葉縣", romaji: "Chiba" },
+          { id: "tokyo", name: "東京都", romaji: "Tokyo" },
+          { id: "kanagawa", name: "神奈川縣", romaji: "Kanagawa" }
+        ]
+      },
+      {
+        id: "chubu",
+        name: "中部地方",
+        kana: "ちゅうぶ",
+        colorBadge: "bg-blue-100 text-blue-800",
+        prefectures: [
+          { id: "niigata", name: "新潟縣", romaji: "Niigata" },
+          { id: "toyama", name: "富山縣", romaji: "Toyama" },
+          { id: "ishikawa", name: "石川縣", romaji: "Ishikawa" },
+          { id: "fukui", name: "福井縣", romaji: "Fukui" },
+          { id: "yamanashi", name: "山梨縣", romaji: "Yamanashi" },
+          { id: "nagano", name: "長野縣", romaji: "Nagano" },
+          { id: "gifu", name: "岐阜縣", romaji: "Gifu" },
+          { id: "shizuoka", name: "靜岡縣", romaji: "Shizuoka" },
+          { id: "aichi", name: "愛知縣", romaji: "Aichi" }
+        ]
+      },
+      {
+        id: "kansai",
+        name: "近畿地方（關西）",
+        kana: "かんさい",
+        colorBadge: "bg-amber-100 text-amber-800",
+        prefectures: [
+          { id: "mie", name: "三重縣", romaji: "Mie" },
+          { id: "shiga", name: "滋賀縣", romaji: "Shiga" },
+          { id: "kyoto", name: "京都府", romaji: "Kyoto" },
+          { id: "osaka", name: "大阪府", romaji: "Osaka" },
+          { id: "hyogo", name: "兵庫縣", romaji: "Hyogo" },
+          { id: "nara", name: "奈良縣", romaji: "Nara" },
+          { id: "wakayama", name: "和歌山縣", romaji: "Wakayama" }
+        ]
+      },
+      {
+        id: "chugoku",
+        name: "中國地方",
+        kana: "ちゅうごく",
+        colorBadge: "bg-teal-100 text-teal-800",
+        prefectures: [
+          { id: "tottori", name: "鳥取縣", romaji: "Tottori" },
+          { id: "shimane", name: "島根縣", romaji: "Shimane" },
+          { id: "okayama", name: "岡山縣", romaji: "Okayama" },
+          { id: "hiroshima", name: "廣島縣", romaji: "Hiroshima" },
+          { id: "yamaguchi", name: "山口縣", romaji: "Yamaguchi" }
+        ]
+      },
+      {
+        id: "shikoku",
+        name: "四國地方",
+        kana: "しこく",
+        colorBadge: "bg-lime-100 text-lime-800",
+        prefectures: [
+          { id: "tokushima", name: "德島縣", romaji: "Tokushima" },
+          { id: "kagawa", name: "香川縣", romaji: "Kagawa" },
+          { id: "ehime", name: "愛媛縣", romaji: "Ehime" },
+          { id: "kochi", name: "高知縣", romaji: "Kochi" }
+        ]
+      },
+      {
+        id: "kyushu",
+        name: "九州・沖繩地方",
+        kana: "きゅうしゅう・おきなわ",
+        colorBadge: "bg-rose-100 text-rose-800",
+        prefectures: [
+          { id: "fukuoka", name: "福岡縣", romaji: "Fukuoka" },
+          { id: "saga", name: "佐賀縣", romaji: "Saga" },
+          { id: "nagasaki", name: "長崎縣", romaji: "Nagasaki" },
+          { id: "kumamoto", name: "熊本縣", romaji: "Kumamoto" },
+          { id: "oita", name: "大分縣", romaji: "Oita" },
+          { id: "miyazaki", name: "宮崎縣", romaji: "Miyazaki" },
+          { id: "kagoshima", name: "鹿兒島縣", romaji: "Kagoshima" },
+          { id: "okinawa", name: "沖繩縣", romaji: "Okinawa" }
+        ]
+      }
+    ];
+
+    // 本地持久化儲存 Key
+    const STORAGE_KEY = 'japan_visited_prefectures_v1';
+
+    // 狀態儲存 (Set 結構紀錄已解鎖的 id)
+    let visitedSet = new Set();
+
+    function loadSavedState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            visitedSet = new Set(parsed);
+          }
+        }
+      } catch (e) {
+        console.warn('無法讀取 localStorage', e);
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(visitedSet)));
+      } catch (e) {
+        console.warn('無法寫入 localStorage', e);
+      }
+    }
+
+    // 稱號與等級判定系統
+    function getRankBadge(count) {
+      if (count === 47) return { icon: "👑", title: "全國制霸・神級達人" };
+      if (count >= 35) return { icon: "🗾", title: "縱貫日本・探險大師" };
+      if (count >= 20) return { icon: "🚄", title: "深度行者・漫遊名家" };
+      if (count >= 10) return { icon: "🏮", title: "道地常客・旅人中堅" };
+      if (count >= 5)  return { icon: "⛩️", title: "初試啼聲・探索先鋒" };
+      if (count >= 1)  return { icon: "🎒", title: "起步啟程・新手旅人" };
+      return { icon: "✈️", title: "整裝待發・夢想啟程" };
+    }
+
+    const regionsContainer = document.getElementById('regions-container');
+
+    function renderRegions() {
+      regionsContainer.innerHTML = '';
+
+      JAPAN_REGIONS.forEach(region => {
+        // 卡片容器
+        const card = document.createElement('section');
+        card.className = "bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex flex-col justify-between";
+
+        // 卡片頂部標題 + 一鍵區域按鈕
+        const regionVisitedCount = region.prefectures.filter(p => visitedSet.has(p.id)).length;
+        const isRegionAllUnlocked = regionVisitedCount === region.prefectures.length;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+              <div>
+                <span class="text-xs px-2 py-0.5 rounded font-semibold ${region.colorBadge}">
+                  ${region.name}
+                </span>
+                <span class="text-[11px] text-slate-400 block mt-0.5">${region.kana}</span>
+              </div>
+              <button 
+                onclick="toggleRegion('${region.id}')"
+                title="切換整區"
+                class="text-xs px-2 py-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition border border-slate-200"
+              >
+                ${isRegionAllUnlocked ? '取消全區' : '全選此區'}
+              </button>
+            </div>
+
+            <!-- 該區的所有縣市按鈕網格 -->
+            <div class="grid grid-cols-2 gap-2" id="grid-${region.id}">
+            </div>
+          </div>
+
+          <div class="mt-3 pt-2 text-[11px] text-slate-400 text-right">
+            已訪: <span class="font-bold text-slate-600">${regionVisitedCount}</span> / ${region.prefectures.length}
+          </div>
+        `;
+
+        regionsContainer.appendChild(card);
+
+        // 填充該區內的都道府縣
+        const grid = card.querySelector(`#grid-${region.id}`);
+        region.prefectures.forEach(pref => {
+          const isUnlocked = visitedSet.has(pref.id);
+          const btn = document.createElement('button');
+          btn.id = `pref-${pref.id}`;
+          btn.setAttribute('data-name', pref.name);
+          btn.setAttribute('data-id', pref.id);
+          btn.className = `pref-node p-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-between transition-all ${
+            isUnlocked ? 'pref-unlocked' : 'pref-locked'
+          }`;
+          
+          btn.innerHTML = `
+            <span>${pref.name}</span>
+            <span class="text-[10px] opacity-75">${isUnlocked ? '✓' : ''}</span>
+          `;
+
+          btn.addEventListener('click', () => togglePrefecture(pref.id));
+          grid.appendChild(btn);
+        });
+      });
+    }
+
+    function togglePrefecture(id) {
+      if (visitedSet.has(id)) {
+        visitedSet.delete(id);
+      } else {
+        visitedSet.add(id);
+      }
+      saveState();
+      updateUI();
+    }
+
+    function toggleRegion(regionId) {
+      const region = JAPAN_REGIONS.find(r => r.id === regionId);
+      if (!region) return;
+
+      const allActive = region.prefectures.every(p => visitedSet.has(p.id));
+      if (allActive) {
+        // 全消
+        region.prefectures.forEach(p => visitedSet.delete(p.id));
+      } else {
+        // 全選
+        region.prefectures.forEach(p => visitedSet.add(p.id));
+      }
+      saveState();
+      updateUI();
+    }
+
+    // 更新計數器與進度條
+    function updateUI() {
+      const count = visitedSet.size;
+      const total = 47;
+      const percentage = ((count / total) * 100).toFixed(1);
+
+      document.getElementById('unlocked-count').textContent = count;
+      document.getElementById('unlocked-percentage').textContent = `${percentage}%`;
+      document.getElementById('progress-bar').style.width = `${percentage}%`;
+
+      // 更新位階徽章
+      const rank = getRankBadge(count);
+      document.getElementById('badge-icon').textContent = rank.icon;
+      document.getElementById('badge-title').textContent = rank.title;
+
+      // 重新渲染區域狀態（保留目前視覺一致性）
+      renderRegions();
+    }
+
+    // 全選與全部重設事件
+    document.getElementById('btn-select-all').addEventListener('click', () => {
+      JAPAN_REGIONS.forEach(region => {
+        region.prefectures.forEach(pref => visitedSet.add(pref.id));
+      });
+      saveState();
+      updateUI();
+      showToast('🎉 已將 47 都道府縣全數點亮！');
+    });
+
+    document.getElementById('btn-clear-all').addEventListener('click', () => {
+      if (visitedSet.size === 0) return;
+      visitedSet.clear();
+      saveState();
+      updateUI();
+      showToast('🔄 已清除全部紀錄');
+    });
+
+    // 複製文字戰報功能
+    document.getElementById('btn-share').addEventListener('click', () => {
+      const count = visitedSet.size;
+      const percentage = ((count / 47) * 100).toFixed(1);
+      const rank = getRankBadge(count);
+      
+      const shareText = `🇯🇵 我的日本 47 都道府縣制霸進度：${count}/47 (${percentage}%)\n當前稱號：【${rank.icon} ${rank.title}】\n快來檢驗你的日本旅遊足跡！`;
+
+      // 遵循 clipboard 規範 fallback
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(shareText).then(() => {
+          showToast('📋 已複製制霸戰報到剪貼簿！');
+        }).catch(() => {
+          fallbackCopyText(shareText);
+        });
+      } else {
+        fallbackCopyText(shareText);
+      }
+    });
+
+    function fallbackCopyText(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('📋 已複製制霸戰報到剪貼簿！');
+      } catch (err) {
+        showToast('⚠️ 複製失敗，請手動截圖分享');
+      }
+      document.body.removeChild(textArea);
+    }
+
+    // 搜尋過濾功能
+    const searchInput = document.getElementById('search-input');
+    searchInput.addEventListener('input', (e) => {
+      const val = e.target.value.trim().toLowerCase();
+      const allButtons = document.querySelectorAll('.pref-node');
+
+      allButtons.forEach(btn => {
+        const name = btn.getAttribute('data-name');
+        const id = btn.getAttribute('data-id');
+        const match = name.includes(val) || id.includes(val);
+        
+        if (!val) {
+          btn.style.opacity = '1';
+          btn.style.transform = 'none';
+        } else if (match) {
+          btn.style.opacity = '1';
+          btn.style.outline = '2px solid #EAB308';
+        } else {
+          btn.style.opacity = '0.25';
+          btn.style.outline = 'none';
+        }
+      });
+    });
+
+    // 自訂 Toast 提示
+    let toastTimeout = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const textEl = document.getElementById('toast-text');
+      textEl.textContent = msg;
+      toast.classList.remove('hidden');
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2500);
+    }
+
+    // 初始化啟動
+    loadSavedState();
+    updateUI();
+  </script>
+</body>
+</html>
